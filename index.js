@@ -15,17 +15,17 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const instructionImageSrc = toImageSource("2.png");
 
   const page = await browser.newPage();
-  await page.setDefaultNavigationTimeout(0);
+   page.setDefaultNavigationTimeout(0);
   const imageDataResponses = await fetchImages(data);
 
   // Generate chapter and material data
   let combinedHtml = buildBookCover(toImageSource("cover.png"));
   combinedHtml += `
-  <div style="display: flex; flex-direction: column; height: 1250px; justify-content: center; align-items: flex-end; background-image: url('${instructionImageSrc}'); 
-  background-size: cover; background-position: center; background-repeat: no-repeat;">
-  </div>
+      <div style="display: flex; flex-direction: column; height: 1250px; justify-content: center; align-items: flex-end; background-image: url('${instructionImageSrc}'); 
+      background-size: cover; background-position: center; background-repeat: no-repeat;">
+      </div>
 
-  <div style="page-break-after: always;"></div>
+      <div style="page-break-after: always;"></div>
   `;
   combinedHtml += buildTableOfContent(data);
   let questionCount = 0;
@@ -203,11 +203,10 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
                 <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
                 <script>
                     document.querySelectorAll('.latex').forEach(function(element) {
-                      const data = element.textContent;
                       try {
                         katex.render(element.textContent, element);
                       } catch (ex) {
-                        console.log(data);
+                        // prevent script break when facing invalid expression
                       }
                     });
                 </script>
@@ -216,74 +215,74 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     `;
   await page.setContent(finalHtml);
   fs.writeFileSync("result.html", finalHtml, "utf-8");
-  // await page.addStyleTag({
-  //   content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
-  //             @page{margin: 100px 80px 40px 80px;}
-  //   `,
-  // });
-  // const pdfBuffer = await getPdfConfig(page, logoImageSrc);
-  // fs.writeFileSync("fullbook.pdf", pdfBuffer);
-  // const outputPdfPath = "fullbook.pdf";
-  // const dataBuffer = fs.readFileSync(outputPdfPath);
-  // const parsedText = await parsePDF(dataBuffer);
+  await page.addStyleTag({
+    content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
+              @page{margin: 100px 80px 40px 80px;}
+    `,
+  });
+  const pdfBuffer = await getPdfConfig(page, logoImageSrc);
+  fs.writeFileSync("fullbook.pdf", pdfBuffer);
+  const outputPdfPath = "fullbook.pdf";
+  const dataBuffer = fs.readFileSync(outputPdfPath);
+  const parsedText = await parsePDF(dataBuffer);
 
-  // let minPage = 0;
-  // for (const [chapterIndex, chapter] of data.chapters.entries()) {
-  //   const chapterId = `toc-chapter-${chapterIndex}`;
-  //   const textContent = await page.$eval(`#${chapterId}`, (element) => {
-  //     return element.textContent;
-  //   });
-  //   const chapterPageNum = extractFirstNumberBeforeKeyword(
-  //     parsedText,
-  //     textContent,
-  //     minPage
-  //   );
-  //   minPage = chapterPageNum;
-  //   const pageNumElementId = `page-num-chapter-${chapterIndex}`;
-  //   await page.evaluate(
-  //     (pageNumElementId, chapterPageNum) => {
-  //       const spanElement = document.getElementById(pageNumElementId);
-  //       if (spanElement) {
-  //         spanElement.textContent = chapterPageNum;
-  //       }
-  //     },
-  //     pageNumElementId,
-  //     chapterPageNum
-  //   );
+  let minPage = 0;
+  for (const [chapterIndex, chapter] of data.chapters.entries()) {
+    const chapterId = `toc-chapter-${chapterIndex}`;
+    const textContent = await page.$eval(`#${chapterId}`, (element) => {
+      return element.textContent;
+    });
+    const chapterPageNum = extractFirstNumberBeforeKeyword(
+      parsedText,
+      textContent,
+      minPage
+    );
+    minPage = chapterPageNum;
+    const pageNumElementId = `page-num-chapter-${chapterIndex}`;
+    await page.evaluate(
+      (pageNumElementId, chapterPageNum) => {
+        const spanElement = document.getElementById(pageNumElementId);
+        if (spanElement) {
+          spanElement.textContent = chapterPageNum;
+        }
+      },
+      pageNumElementId,
+      chapterPageNum
+    );
 
-  //   for (const [materialIndex] of chapter.materials.entries()) {
-  //     const materialId = `toc-material-${chapterIndex}-${materialIndex}`;
-  //     const textContent = await page.$eval(`#${materialId}`, (element) => {
-  //       return element.textContent;
-  //     });
+    for (const [materialIndex] of chapter.materials.entries()) {
+      const materialId = `toc-material-${chapterIndex}-${materialIndex}`;
+      const textContent = await page.$eval(`#${materialId}`, (element) => {
+        return element.textContent;
+      });
 
-  //     let materialPageNum;
-  //     if (materialIndex === 0) {
-  //       materialPageNum = chapterPageNum;
-  //     } else {
-  //       materialPageNum = extractFirstNumberBeforeKeyword(
-  //         parsedText,
-  //         textContent,
-  //         minPage
-  //       );
-  //       minPage = materialPageNum;
-  //     }
+      let materialPageNum;
+      if (materialIndex === 0) {
+        materialPageNum = chapterPageNum;
+      } else {
+        materialPageNum = extractFirstNumberBeforeKeyword(
+          parsedText,
+          textContent,
+          minPage
+        );
+        minPage = materialPageNum;
+      }
 
-  //     const pageNumMaterialId = `page-num-material-${chapterIndex}-${materialIndex}`;
-  //     await page.evaluate(
-  //       (pageNumMaterialId, materialPageNum) => {
-  //         const element = document.getElementById(pageNumMaterialId);
-  //         if (element) {
-  //           element.textContent = materialPageNum;
-  //         }
-  //       },
-  //       pageNumMaterialId,
-  //       materialPageNum
-  //     );
-  //   }
-  // }
-  // const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc);
-  // fs.writeFileSync("fullbook.pdf", pdfBufferWithToc);
+      const pageNumMaterialId = `page-num-material-${chapterIndex}-${materialIndex}`;
+      await page.evaluate(
+        (pageNumMaterialId, materialPageNum) => {
+          const element = document.getElementById(pageNumMaterialId);
+          if (element) {
+            element.textContent = materialPageNum;
+          }
+        },
+        pageNumMaterialId,
+        materialPageNum
+      );
+    }
+  }
+  const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc);
+  fs.writeFileSync("fullbook.pdf", pdfBufferWithToc);
   console.log("PDF generated successfully.");
   await browser.close();
 })();
