@@ -376,6 +376,7 @@ async function getPdfConfig(page, imageSrc) {
       left: "80px",
       right: "80px",
     },
+    height: '1055px'
   });
 }
 
