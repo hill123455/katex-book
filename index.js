@@ -8,6 +8,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
 (async () => {
   const browser = await puppeteer.launch({
+    headless: true,
     protocolTimeout: 0,
   });
 
@@ -15,7 +16,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const instructionImageSrc = toImageSource("2.png");
 
   const page = await browser.newPage();
-   page.setDefaultNavigationTimeout(0);
+  page.setDefaultNavigationTimeout(0);
   const imageDataResponses = await fetchImages(data);
 
   // Generate chapter and material data
