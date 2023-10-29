@@ -1,16 +1,17 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook3.json");
+const data = require("./fullbook.json");
 const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
+const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 
 (async () => {
+
   const browser = await puppeteer.launch({
     protocolTimeout: 0,
   });
-
   const logoImageSrc = toImageSource("LogoText_Blue.png");
   const instructionImageSrc = toImageSource("2.png");
 
@@ -36,7 +37,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       combinedHtml += '<div style="page-break-after: always;"></div>';
     }
     const chapterId = `chapter-${chapterIndex}`;
-    combinedHtml += `<div id="${chapterId}" class="chapter"><div class="chapter-name">${chapter.name}</div>`;
+    combinedHtml += `<div id="${chapterId}" class="chapter"><span class="chapter-name">${chapter.name}</span>`;
     questionCount = 0;
 
     for (const [materialIndex, material] of chapter.materials.entries()) {
@@ -49,9 +50,10 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       } else {
         combinedHtml += `<div id="${materialId}" class="chapter chapter-material">${material.name}</div>`;
       }
+      combinedHtml+=`<div id="${materialId}section">`;
 
       for (const topic of material.topics) {
-        const topicUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${material.name}`;
+        const topicUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${material.name}/lectures/${topic.id}`;
         const topicQrCodeData = await QRCode.toDataURL(topicUrl);
         const maxTopicQuestion = questionCountGlobal + topic.questions.length;
         const topicHeader = `<div class= "topicContainer">
@@ -105,6 +107,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
               combinedHtml += topicHeader;
             }
           }
+          combinedHtml+= '</div>';
         }
 
         if (questionCount % 3 !== 0) {
@@ -209,7 +212,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
         </html>
     `;
   await page.setContent(finalHtml);
-  fs.writeFileSync("result.html", finalHtml, "utf-8");
+  // fs.writeFileSync("result.html", finalHtml, "utf-8");
   await page.addStyleTag({
     content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
               @page{margin: 100px 80px 40px 80px;}
@@ -220,20 +223,15 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const outputPdfPath = "fullbook.pdf";
   const dataBuffer = fs.readFileSync(outputPdfPath);
   let parsedText = await parsePDF(dataBuffer);
+  const mapMaterialPage = {};
 
-  let minPage = 0;
   for (const [chapterIndex, chapter] of data.chapters.entries()) {
     const chapterId = `toc-chapter-${chapterIndex}`;
     const textContent = await page.$eval(`#${chapterId}`, (element) => {
       return element.textContent;
     });
-    const res = extractFirstNumberBeforeKeyword(
-      parsedText,
-      textContent,
-      minPage
-    );
+    const res = extractFirstNumberBeforeKeyword(parsedText,textContent,);
     const chapterPageNum = res.extractedNumber;
-    minPage = chapterPageNum;
     parsedText = res.modifiedText;
     const pageNumElementId = `page-num-chapter-${chapterIndex}`;
     await page.evaluate(
@@ -257,14 +255,9 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       if (materialIndex === 0) {
         materialPageNum = chapterPageNum;
       } else {
-        const resMaterial = extractFirstNumberBeforeKeyword(
-          parsedText,
-          textContent,
-          minPage
-        );
+        const resMaterial = extractFirstNumberBeforeKeyword(parsedText,textContent);
         materialPageNum = resMaterial.extractedNumber;
         parsedText = resMaterial.modifiedText;
-        minPage = materialPageNum;
       }
 
       const pageNumMaterialId = `page-num-material-${chapterIndex}-${materialIndex}`;
@@ -278,11 +271,40 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
         pageNumMaterialId,
         materialPageNum
       );
+
+      mapMaterialPage[materialPageNum] = textContent;
     }
   }
+  
   const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc);
-  fs.writeFileSync("fullbook.pdf", pdfBufferWithToc);
+  const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
+
+
+  let prevText = "";
+  let prevKey = 0;
+  mapMaterialPage[pdfDoc.getPageCount()+1] = "";
+  for (let key in mapMaterialPage) {
+    const numericKey = parseInt(key, 10);
+    if (prevKey != 0) {
+      for (let i = prevKey; i < numericKey - 1; i++) {
+        const page = pdfDoc.getPage(i);
+        page.drawText(prevText, {
+          x: 25,
+          y: 32,
+          size: 10,
+          color: rgb(103 / 255, 103 / 255, 103 / 255),
+        });
+      }
+    }
+    prevText = mapMaterialPage[key];
+    prevKey = numericKey;
+  }
+
+  // Save the modified PDF to a buffer
+  const modifiedPdfBytes = await pdfDoc.save();
+  fs.writeFileSync("fullbook.pdf", modifiedPdfBytes);
   console.log("PDF generated successfully.");
+  
   await browser.close();
 })();
 
@@ -343,21 +365,19 @@ async function parsePDF(buffer) {
   return data.text;
 }
 
-function extractFirstNumberBeforeKeyword(text, keyword, threshold) {
-  const pattern = new RegExp(
-    `(\\d+(\\.\\d+)?)\\s*${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`
-  );
-  let match;
+function extractFirstNumberBeforeKeyword(text, keyword) {
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(\\d+(\\.\\d+)?)\\s*${escapedKeyword}`);
 
-  while ((match = pattern.exec(text)) !== null) {
-    const extractedNumber = parseFloat(match[1]); // Use parseFloat instead of parseInt for decimal numbers
-    if (extractedNumber > threshold) {
-      return {
-        extractedNumber: extractedNumber,
-        modifiedText: text.substring(match.index, text.length),
-      };
-    }
+  if (pattern.test(text)) {
+    const match = text.match(pattern);
+    const extractedNumber = parseFloat(match[1]);
+    return {
+      extractedNumber: extractedNumber,
+      modifiedText: text.substring(match.index, text.length),
+    };
   }
+
   return {
     extractedNumber: null,
     modifiedText: text,
