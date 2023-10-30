@@ -1,122 +1,31 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook.json");
+const data = require("./fullbook.avg.json");
 const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
+const { PDFDocument, rgb } = require("pdf-lib");
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
-const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
+
 
 (async () => {
+  const logoImageSrc = toImageSource("LogoText_Blue.png");
+  const instructionImageSrc = toImageSource("2.png");
+  const coverImageSrc = toImageSource("advanced-functions-cover.png");
+  const imageDataResponses = await fetchImages(data);
 
   const browser = await puppeteer.launch({
     protocolTimeout: 0,
   });
-  const logoImageSrc = toImageSource("LogoText_Blue.png");
-  const instructionImageSrc = toImageSource("2.png");
-
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
-  const imageDataResponses = await fetchImages(data);
 
-  // Generate chapter and material data
-  let combinedHtml = buildBookCover(toImageSource("algebra-1-cover.png"));
-  combinedHtml += `
-      <div style="display: flex; flex-direction: column; height: 1250px; justify-content: center; align-items: flex-end; background-image: url('${instructionImageSrc}'); 
-      background-size: cover; background-position: center; background-repeat: no-repeat;">
-      </div>
-
-      <div style="page-break-after: always;"></div>
-  `;
+  // Start build HTML content
+  let combinedHtml;
+  combinedHtml += buildBookCover(coverImageSrc);
+  combinedHtml += buildInstructionPage(instructionImageSrc);
   combinedHtml += buildTableOfContent(data);
-  let questionCount = 0;
-  let questionCountGlobal = 0;
-  let imageDataIndex = 0;
-  for (const [chapterIndex, chapter] of data.chapters.entries()) {
-    if (chapterIndex !== 0) {
-      combinedHtml += '<div style="page-break-after: always;"></div>';
-    }
-    const chapterId = `chapter-${chapterIndex}`;
-    combinedHtml += `<div id="${chapterId}" class="chapter"><span class="chapter-name">${chapter.name}</span>`;
-    questionCount = 0;
-
-    for (const [materialIndex, material] of chapter.materials.entries()) {
-      if (questionCount !== 0 && questionCount % 3 !== 0) {
-        combinedHtml += '<div style="page-break-after: always;"></div>';
-      }
-      const materialId = `material-${chapterIndex}-${materialIndex}`;
-      if (materialIndex === 0) {
-        combinedHtml += `<div id="${materialId}" class="chapter-material">${material.name}</div></div>`;
-      } else {
-        combinedHtml += `<div id="${materialId}" class="chapter chapter-material">${material.name}</div>`;
-      }
-      combinedHtml+=`<div id="${materialId}section">`;
-
-      for (const topic of material.topics) {
-        const topicUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${material.name}/lectures/${topic.id}`;
-        const topicQrCodeData = await QRCode.toDataURL(topicUrl);
-        const maxTopicQuestion = questionCountGlobal + topic.questions.length;
-        const topicHeader = `<div class= "topicContainer">
-                                <div style="font-size: 20px;">Accompanying lectures for questions ${questionCountGlobal + 1} - ${maxTopicQuestion}</div>
-                                <a target="_blank" href="${topicUrl}" style="float: right; margin-right: 10%;">
-                                  <img style="width: 100px;" src="${topicQrCodeData}"/>
-                                </a>
-                            </div>
-                            <div style="clear: both;"></div>
-                            <hr class="question-separator" style="background-color: #333">
-                            `;
-        if (topic.questions.length > 0) {
-          combinedHtml += topicHeader;
-        }
-        questionCount = 0;
-        for (const question of topic.questions) {
-          let { question_html } = question;
-          questionCount++;
-          questionCountGlobal++;
-          let imgMatch;
-          while ((imgMatch = imgRegex.exec(question_html)) !== null) {
-            const imageData = imageDataResponses[imageDataIndex];
-            if (imageData && imageData.data) {
-              question_html = question_html.replace(
-                imgMatch[0],
-                `<img style="display:block" src="${imageData.data.imageURL}"/>`
-              );
-            }
-            imageDataIndex++;
-          }
-
-          combinedHtml += `<div style="page-break-inside: avoid"><div class="question-text not-first-question">Question ${questionCountGlobal}: ${question_html}</div>`;
-          const solutionUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${formattedName(material.name)}/${question.id}`;
-          const qrCodeSolutionDataUrl = await QRCode.toDataURL(solutionUrl);
-          combinedHtml += `<div class="answerContainer">
-                        <div></div>
-                        <div></div>
-                        <div>Solution Video </div>
-                        <div>
-                          <a target="_blank" href="${solutionUrl}">
-                            <img style="width:100px" src="${qrCodeSolutionDataUrl}" />
-                          </a>
-                        </div>
-                    </div></div>`;
-          if (questionCount % 3 !== 0) {
-            combinedHtml += `<hr class="question-separator" style="background-color: #333">`;
-          }
-          if (questionCount % 3 === 0) {
-            combinedHtml += '<div style="page-break-after: always;"></div>';
-            if (questionCountGlobal < maxTopicQuestion) {
-              combinedHtml += topicHeader;
-            }
-          }
-          combinedHtml+= '</div>';
-        }
-
-        if (questionCount % 3 !== 0) {
-          combinedHtml += '<div style="page-break-after: always;"></div>';
-          questionCount = 0;
-        }
-      }
-    }
-  }
+  combinedHtml += await buildBookContent(imageDataResponses, data);
 
   const finalHtml = `
         <!DOCTYPE html>
@@ -289,7 +198,7 @@ const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
       for (let i = prevKey; i < numericKey - 1; i++) {
         const page = pdfDoc.getPage(i);
         page.drawText(prevText, {
-          x: 25,
+          x: 65,
           y: 32,
           size: 10,
           color: rgb(103 / 255, 103 / 255, 103 / 255),
@@ -304,32 +213,23 @@ const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
   const modifiedPdfBytes = await pdfDoc.save();
   fs.writeFileSync("fullbook.pdf", modifiedPdfBytes);
   console.log("PDF generated successfully.");
-  
   await browser.close();
 })();
 
-function fetchImages(data) {
-  const imageIds = [];
-  for (const chapter of data.chapters) {
-    for (const material of chapter.materials) {
-      for (const topic of material.topics) {
-        for (const question of topic.questions) {
-          let imgMatch;
-          while ((imgMatch = imgRegex.exec(question.question_html)) !== null) {
-            const imageId = imgMatch[1];
-            imageIds.push(imageId);
-          }
-        }
-      }
-    }
-  }
-  return Promise.all(
-    imageIds.map((imageId) =>
-      axios.get(
-        `https://app.prepanywhere.com/api/stu/live_classrooms/get_image?id=${imageId}`
-      )
-    )
-  );
+function buildBookCover(imageSrc) {
+  return `
+  <div style="background-image: url('${imageSrc}'); background-size: cover; background-position: center; width: 150%; height: 149.9%; position: absolute; top: 0; left: 0;"></div>
+  <div style="page-break-after: always;"></div>`;
+}
+
+function buildInstructionPage(instructionImageSrc) {
+  return `
+  <div style="display: flex; flex-direction: column; height: 125vh; width: 90vh ;justify-content: center; align-items: flex-end; background-image: url('${instructionImageSrc}'); 
+  background-size: contain; background-position: center; margin: 0; padding: 0;background-repeat: no-repeat">
+  </div>
+
+  <div style="page-break-after: always;"></div>
+  `;
 }
 
 function buildTableOfContent(data) {
@@ -353,16 +253,97 @@ function buildTableOfContent(data) {
   return tableOfContentsHtml;
 }
 
-function buildBookCover(imageSrc) {
-  return `
-  <div style="background-image: url('${imageSrc}'); background-size: cover; background-position: center; width: 100%; height: 1600px; display: flex; flex-direction: column; align-items: flex-end;">
-  </div>
-  <div style="page-break-after: always;"></div>`;
-}
+async function buildBookContent(imageDataResponses, data) {
+  let content = '';
+  let questionCount = 0;
+  let questionCountGlobal = 0;
+  let imageDataIndex = 0;
+  for (const [chapterIndex, chapter] of data.chapters.entries()) {
+    if (chapterIndex !== 0) {
+      content += '<div style="page-break-after: always;"></div>';
+    }
+    const chapterId = `chapter-${chapterIndex}`;
+    content += `<div id="${chapterId}" class="chapter"><span class="chapter-name">${chapter.name}</span>`;
+    questionCount = 0;
 
-async function parsePDF(buffer) {
-  const data = await PDFParser(buffer);
-  return data.text;
+    for (const [materialIndex, material] of chapter.materials.entries()) {
+      if (questionCount !== 0 && questionCount % 3 !== 0) {
+        content += '<div style="page-break-after: always;"></div>';
+      }
+      const materialId = `material-${chapterIndex}-${materialIndex}`;
+      if (materialIndex === 0) {
+        content += `<div id="${materialId}" class="chapter-material">${material.name}</div></div>`;
+      } else {
+        content += `<div id="${materialId}" class="chapter chapter-material">${material.name}</div>`;
+      }
+      content+=`<div id="${materialId}section">`;
+
+      for (const topic of material.topics) {
+        const topicUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${material.name}/lectures/${topic.id}`;
+        const topicQrCodeData = await QRCode.toDataURL(topicUrl);
+        const maxTopicQuestion = questionCountGlobal + topic.questions.length;
+        const topicHeader = `<div class= "topicContainer">
+                                <div style="font-size: 20px;">Accompanying lectures for questions ${questionCountGlobal + 1} - ${maxTopicQuestion}</div>
+                                <a target="_blank" href="${topicUrl}" style="float: right; margin-right: 10%;">
+                                  <img style="width: 100px;" src="${topicQrCodeData}"/>
+                                </a>
+                            </div>
+                            <div style="clear: both;"></div>
+                            <hr class="question-separator" style="background-color: #333">
+                            `;
+        if (topic.questions.length > 0) {
+          content += topicHeader;
+        }
+        questionCount = 0;
+        for (const question of topic.questions) {
+          let { question_html } = question;
+          questionCount++;
+          questionCountGlobal++;
+          let imgMatch;
+          while ((imgMatch = imgRegex.exec(question_html)) !== null) {
+            const imageData = imageDataResponses[imageDataIndex];
+            if (imageData && imageData.data) {
+              question_html = question_html.replace(
+                imgMatch[0],
+                `<img style="display:block" src="${imageData.data.imageURL}"/>`
+              );
+            }
+            imageDataIndex++;
+          }
+
+          content += `<div style="page-break-inside: avoid"><div class="question-text not-first-question">Question ${questionCountGlobal}: ${question_html}</div>`;
+          const solutionUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${formattedName(material.name)}/${question.id}`;
+          const qrCodeSolutionDataUrl = await QRCode.toDataURL(solutionUrl);
+          content += `<div class="answerContainer">
+                        <div></div>
+                        <div></div>
+                        <div>Solution Video </div>
+                        <div>
+                          <a target="_blank" href="${solutionUrl}">
+                            <img style="width:100px" src="${qrCodeSolutionDataUrl}" />
+                          </a>
+                        </div>
+                    </div></div>`;
+          if (questionCount % 3 !== 0) {
+            content += `<hr class="question-separator" style="background-color: #333">`;
+          }
+          if (questionCount % 3 === 0) {
+            content += '<div style="page-break-after: always;"></div>';
+            if (questionCountGlobal < maxTopicQuestion) {
+              content += topicHeader;
+            }
+          }
+          content+= '</div>';
+        }
+
+        if (questionCount % 3 !== 0) {
+          content += '<div style="page-break-after: always;"></div>';
+          questionCount = 0;
+        }
+      }
+    }
+  }
+  return content;
 }
 
 function extractFirstNumberBeforeKeyword(text, keyword) {
@@ -413,4 +394,33 @@ function toImageSource(imagePath) {
 
 function formattedName(name) {
   return name.replace(/\s+/g, "-").toLowerCase();
+}
+
+function fetchImages(data) {
+  const imageIds = [];
+  for (const chapter of data.chapters) {
+    for (const material of chapter.materials) {
+      for (const topic of material.topics) {
+        for (const question of topic.questions) {
+          let imgMatch;
+          while ((imgMatch = imgRegex.exec(question.question_html)) !== null) {
+            const imageId = imgMatch[1];
+            imageIds.push(imageId);
+          }
+        }
+      }
+    }
+  }
+  return Promise.all(
+    imageIds.map((imageId) =>
+      axios.get(
+        `https://app.prepanywhere.com/api/stu/live_classrooms/get_image?id=${imageId}`
+      )
+    )
+  );
+}
+
+async function parsePDF(buffer) {
+  const data = await PDFParser(buffer);
+  return data.text;
 }
