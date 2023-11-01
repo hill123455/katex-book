@@ -1,6 +1,6 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook.avg.json");
+const data = require("./fullbook.json");
 const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
@@ -10,7 +10,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
 (async () => {
   const logoImageSrc = toImageSource("LogoText_Blue.png");
-  const instructionImageSrc = toImageSource("2.png");
+  const instructionImageSrc = toImageSource("instruction-cover.png");
   const coverImageSrc = toImageSource("advanced-functions-cover.png");
   const imageDataResponses = await fetchImages(data);
 
