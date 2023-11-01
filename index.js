@@ -209,7 +209,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     prevKey = numericKey;
   }
 
-
+  
   const firstPage = pdfDoc.getPage(0);
   const { width, height } = firstPage.getSize();
   const image = await pdfDoc.embedPng(coverImageSrc);
@@ -218,6 +218,15 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     y: 0,
     width: width,
     height: height,
+  });
+
+  const secondPage = pdfDoc.getPage(1);
+  const instructionImage = await pdfDoc.embedPng(instructionImageSrc);
+  secondPage.drawImage(instructionImage, {
+    x: width/8,
+    y:  height/6,
+    width: width/1.3,
+    height: height/1.35,
   });
 
   // Save the modified PDF to a buffer
@@ -235,11 +244,7 @@ function buildBookCover() {
 
 function buildInstructionPage(instructionImageSrc) {
   return `
-  <div style="display: flex; flex-direction: column; height: 125vh; width: 90vh ;justify-content: center; align-items: flex-end; background-image: url('${instructionImageSrc}'); 
-  background-size: contain; background-position: center; margin: 0; padding: 0;background-repeat: no-repeat">
-  </div>
-
-  <div style="page-break-after: always;"></div>
+  <div></div><div style="page-break-after: always;"></div>
   `;
 }
 
@@ -387,7 +392,7 @@ async function getPdfConfig(page, imageSrc) {
                 <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
                     <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
                 </div>
-            `,
+            `,       
   });
 }
 
