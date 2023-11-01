@@ -22,7 +22,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
   // Start build HTML content
   let combinedHtml;
-  combinedHtml += buildBookCover(coverImageSrc);
+  combinedHtml += buildBookCover();
   combinedHtml += buildInstructionPage(instructionImageSrc);
   combinedHtml += buildTableOfContent(data);
   combinedHtml += await buildBookContent(imageDataResponses, data);
@@ -209,6 +209,17 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     prevKey = numericKey;
   }
 
+
+  const firstPage = pdfDoc.getPage(0);
+  const { width, height } = firstPage.getSize();
+  const image = await pdfDoc.embedPng(coverImageSrc);
+  firstPage.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: width,
+    height: height,
+  });
+
   // Save the modified PDF to a buffer
   const modifiedPdfBytes = await pdfDoc.save();
   fs.writeFileSync("fullbook.pdf", modifiedPdfBytes);
@@ -216,9 +227,9 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   await browser.close();
 })();
 
-function buildBookCover(imageSrc) {
+function buildBookCover() {
   return `
-  <div style="background-image: url('${imageSrc}'); background-size: cover; background-position: center; width: 150%; height: 149.9%; position: absolute; top: 0; left: 0;"></div>
+  <div></div>
   <div style="page-break-after: always;"></div>`;
 }
 
@@ -377,13 +388,6 @@ async function getPdfConfig(page, imageSrc) {
                     <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
                 </div>
             `,
-    margin: {
-      top: "100px",
-      bottom: "40px",
-      left: "80px",
-      right: "80px",
-    },
-    height: "1055px",
   });
 }
 
