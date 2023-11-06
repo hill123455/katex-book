@@ -1,6 +1,6 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook.json");
+const data = require("./fullbook.min.json");
 const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
@@ -11,7 +11,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 (async () => {
   const logoImageSrc = toImageSource("LogoText_Blue.png");
   const instructionImageSrc = toImageSource("instruction-cover.png");
-  const coverImageSrc = toImageSource("advanced-functions-cover.png");
+  const coverImageSrc = toImageSource("algebra-1-cover.png");
   const imageDataResponses = await fetchImages(data);
 
   const browser = await puppeteer.launch({
@@ -31,6 +31,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
         <!DOCTYPE html>
         <html>
             <head>
+                <link href='https://fonts.googleapis.com/css?family=Inter' rel='stylesheet'>
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
                 <style>
                 body {
@@ -124,7 +125,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   // fs.writeFileSync("result.html", finalHtml, "utf-8");
   await page.addStyleTag({
     content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
-              @page{margin: 100px 80px 40px 80px;}
+              @page{margin: 90px 80px 50px 80px;}
     `,
   });
   const pdfBuffer = await getPdfConfig(page, logoImageSrc);
@@ -139,7 +140,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     const textContent = await page.$eval(`#${chapterId}`, (element) => {
       return element.textContent;
     });
-    const res = extractFirstNumberBeforeKeyword(parsedText,textContent,);
+    const res = extractFirstNumberBeforeKeyword(parsedText,textContent);
     const chapterPageNum = res.extractedNumber;
     parsedText = res.modifiedText;
     const pageNumElementId = `page-num-chapter-${chapterIndex}`;
@@ -187,7 +188,6 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   
   const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc);
   const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
-
 
   let prevText = "";
   let prevKey = 0;
@@ -381,18 +381,25 @@ function extractFirstNumberBeforeKeyword(text, keyword) {
   };
 }
 
+
 async function getPdfConfig(page, imageSrc) {
   return await page.pdf({
     printBackground: true,
     colorSpace: "srgb",
     timeout: 0,
     displayHeaderFooter: true,
-    headerTemplate: `<img src="${imageSrc}" style="max-width: 20%; max-height: 20%; position: absolute; left: 89px; top:35px; padding-bottom:10px;"/>`,
+    headerTemplate: `
+    <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px; font-family: 'Inter', sans-serif;">
+      <img src="${imageSrc}" style="max-width: 20%;"/>
+      <a href="https://prepbox.io" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); 
+       text-decoration: none; color: black; font-weight: bold;">Let’s practice and review on PrepBox</a>
+    </div>
+    `,
     footerTemplate: `
-                <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
-                    <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
-                </div>
-            `,       
+    <div style="width: 100%; font-size: 14px;color: #bbb; position: relative; font-family: 'Inter', sans-serif;">
+        <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
+    </div>
+    `,       
   });
 }
 
