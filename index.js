@@ -389,14 +389,14 @@ async function getPdfConfig(page, imageSrc) {
     timeout: 0,
     displayHeaderFooter: true,
     headerTemplate: `
-    <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px; font-family: 'Inter', sans-serif;">
+    <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px;">
       <img src="${imageSrc}" style="max-width: 20%;"/>
       <a href="https://prepbox.io" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); 
        text-decoration: none; color: black; font-weight: bold;">Let’s practice and review on PrepBox</a>
     </div>
     `,
     footerTemplate: `
-    <div style="width: 100%; font-size: 14px;color: #bbb; position: relative; font-family: 'Inter', sans-serif;">
+    <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
         <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
     </div>
     `,       
