@@ -13,6 +13,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const instructionImageSrc = toImageSource("instruction-cover.png");
   const coverImageSrc = toImageSource("algebra-1-cover.png");
   const imageDataResponses = await fetchImages(data);
+  const fontContent = fs.readFileSync("./Inter-Regular.txt", "utf8");
 
   const browser = await puppeteer.launch({
     protocolTimeout: 0,
@@ -31,9 +32,13 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
         <!DOCTYPE html>
         <html>
             <head>
-                <link href='https://fonts.googleapis.com/css?family=Inter' rel='stylesheet'>
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
                 <style>
+                @font-face {
+                  font-family: 'Inter';
+                  src: url(${fontContent}) format('truetype');
+                }
+
                 body {
                     font-family: 'Inter', sans-serif;
                 }
@@ -128,7 +133,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
               @page{margin: 90px 80px 50px 80px;}
     `,
   });
-  const pdfBuffer = await getPdfConfig(page, logoImageSrc);
+  const pdfBuffer = await getPdfConfig(page, logoImageSrc, fontContent);
   fs.writeFileSync("fullbook.pdf", pdfBuffer);
   const outputPdfPath = "fullbook.pdf";
   const dataBuffer = fs.readFileSync(outputPdfPath);
@@ -186,7 +191,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     }
   }
   
-  const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc);
+  const pdfBufferWithToc = await getPdfConfig(page, logoImageSrc, fontContent);
   const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
 
   let prevText = "";
@@ -382,20 +387,22 @@ function extractFirstNumberBeforeKeyword(text, keyword) {
 }
 
 
-async function getPdfConfig(page, imageSrc) {
+async function getPdfConfig(page, imageSrc, fontContent) {
   return await page.pdf({
     printBackground: true,
     colorSpace: "srgb",
     timeout: 0,
     displayHeaderFooter: true,
     headerTemplate: `
+    <style>@font-face {font-family: 'Inter';src: url(${fontContent}) format('truetype');}
+    </style>
     <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px;">
       <img src="${imageSrc}" style="max-width: 20%;"/>
       <a href="https://prepbox.io" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); 
-       text-decoration: none; color: black; font-weight: bold;">Let’s practice and review on PrepBox</a>
-    </div>
-    `,
+       text-decoration: none; color: black; font-weight: bold; font-family: 'Inter', sans-serif;">Let’s practice and review on PrepBox</a>
+    </div>`,
     footerTemplate: `
+    <style>@font-face {font-family: 'Inter';src: url(${fontContent}) format('truetype');}</style>
     <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
         <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
     </div>
