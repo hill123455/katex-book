@@ -1,6 +1,6 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook.min.json");
+const data = require("./fullbook2.json");
 const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
@@ -13,7 +13,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const instructionImageSrc = toImageSource("instruction-cover.png");
   const coverImageSrc = toImageSource("algebra-1-cover.png");
   const imageDataResponses = await fetchImages(data);
-  const fontContent = fs.readFileSync("./Inter-Regular.txt", "utf8");
+  const interFontRegularBase64 = fs.readFileSync("./Inter-Regular.txt", "utf8");
 
   const browser = await puppeteer.launch({
     protocolTimeout: 0,
@@ -22,7 +22,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   // Start build HTML content
   let combinedHtml;
   combinedHtml += buildBookCover();
-  combinedHtml += buildInstructionPage(instructionImageSrc);
+  combinedHtml += buildInstructionPage();
   combinedHtml += buildTableOfContent(data);
   combinedHtml += await buildBookContent(imageDataResponses, data);
 
@@ -35,7 +35,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
               @page{margin: 90px 80px 50px 80px;}
     `,
   });
-  const pdfBuffer = await getPdfConfig(page, logoImageSrc, fontContent);
+  const pdfBuffer = await getPdfConfig(page, logoImageSrc);
   fs.writeFileSync("fullbook.pdf", pdfBuffer);
   const outputPdfPath = "fullbook.pdf";
   const dataBuffer = fs.readFileSync(outputPdfPath);
@@ -46,15 +46,12 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   await pageFinal.setContent(
     buildFinalHtml(
       `@font-face {
-    font-family: 'Inter';
-    src: url(${fontContent}) format('truetype');
-  }
-  body {
-      font-family: 'Inter', sans-serif;
-  }`,
-      combinedHtml
-    )
-  );
+        font-family: 'Inter';
+        src: url(${interFontRegularBase64}) format('truetype');
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+      }`,combinedHtml));
   await pageFinal.addStyleTag({
     content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
               @page{margin: 90px 80px 50px 80px;}
@@ -115,15 +112,13 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     }
   }
 
-  const pdfBufferWithToc = await getPdfConfig(
-    pageFinal,
-    logoImageSrc,
-    fontContent
-  );
+  const pdfBufferWithToc = await getPdfConfig(pageFinal,logoImageSrc);
   const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
   pdfDoc.registerFontkit(fontKit);
-  const customFont1 = fs.readFileSync('./font/Inter-Regular.ttf');
-  const cusFont1 = await pdfDoc.embedFont(customFont1);
+  const interRegular = fs.readFileSync('./font/Inter-Regular.ttf');
+  const interBold = fs.readFileSync('./font/Inter-Bold.ttf');
+  const interRegularFont = await pdfDoc.embedFont(interRegular);
+  const interBoldFont = await pdfDoc.embedFont(interBold);
   let prevText = "";
   let prevKey = 0;
   mapMaterialPage[pdfDoc.getPageCount() + 1] = "";
@@ -133,7 +128,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       for (let i = prevKey; i < numericKey - 1; i++) {
         const page = pdfDoc.getPage(i);
         page.drawText(prevText, {
-          font: cusFont1,
+          font: interRegularFont,
           x: 65,
           y: 32,
           size: 10,
@@ -163,6 +158,16 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     width: width / 1.3,
     height: height / 1.35,
   });
+
+  for(let i = 1; i < pdfDoc.getPageCount(); i++) {
+    const currentPage = pdfDoc.getPage(i);
+    currentPage.drawText("Let’s practice and review on PrepBox", {
+      font: interBoldFont,
+      x: width - 247,
+      y: height - 47,
+      size: 10
+    });
+  }
 
   // Save the modified PDF to a buffer
   const modifiedPdfBytes = await pdfDoc.save();
@@ -326,18 +331,17 @@ function extractFirstNumberBeforeKeyword(text, keyword) {
   };
 }
 
-async function getPdfConfig(page, imageSrc, fontContent) {
+async function getPdfConfig(page, imageSrc) {
   return await page.pdf({
     printBackground: true,
     colorSpace: "srgb",
     timeout: 0,
     displayHeaderFooter: true,
     headerTemplate: `
-    <style>@font-face {font-family: 'Inter';src: url(${fontContent}) format('truetype');}</style>
-    <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px;">
+    <div style="width: 100%; position: relative; font-size: 14px;margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px;">
       <img src="${imageSrc}" style="max-width: 20%;"/>
-      <a href="https://prepbox.io" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); 
-       text-decoration: none; color: black; font-weight: bold; font-family: 'Inter';">Let’s practice and review on PrepBox</a>
+      <a href="https://prepbox.io" style="position: absolute; right: 0; top: 54%; transform: translateY(-50%); 
+      text-decoration: none; color: transparent">Let’s practice and review on PrepBoxx</a>
     </div>`,
     footerTemplate: `
     <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
@@ -385,7 +389,7 @@ async function parsePDF(buffer) {
   return data.text;
 }
 
-function buildFinalHtml(customStyle, contentHtml) {
+function buildFinalHtml(customStyle, contentHtml, link) {
   return `
   <!DOCTYPE html>
   <html>
