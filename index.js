@@ -5,6 +5,7 @@ const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
 const { PDFDocument, rgb } = require("pdf-lib");
+const fontKit = require ('@pdf-lib/fontkit')
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
 (async () => {
@@ -120,7 +121,9 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     fontContent
   );
   const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
-
+  pdfDoc.registerFontkit(fontKit);
+  const customFont1 = fs.readFileSync('./font/Inter-Regular.ttf');
+  const cusFont1 = await pdfDoc.embedFont(customFont1);
   let prevText = "";
   let prevKey = 0;
   mapMaterialPage[pdfDoc.getPageCount() + 1] = "";
@@ -130,6 +133,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       for (let i = prevKey; i < numericKey - 1; i++) {
         const page = pdfDoc.getPage(i);
         page.drawText(prevText, {
+          font: cusFont1,
           x: 65,
           y: 32,
           size: 10,
@@ -333,7 +337,7 @@ async function getPdfConfig(page, imageSrc, fontContent) {
     <div style="width: 100%; position: relative; font-size: 14px; color: #bbb; margin-left: 89px; margin-top: 20px; line-height: 20%; margin-right: 89px;">
       <img src="${imageSrc}" style="max-width: 20%;"/>
       <a href="https://prepbox.io" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); 
-       text-decoration: none; color: black; font-weight: bold; font-family: 'Inter', sans-serif;">Let’s practice and review on PrepBox</a>
+       text-decoration: none; color: black; font-weight: bold; font-family: 'Inter';">Let’s practice and review on PrepBox</a>
     </div>`,
     footerTemplate: `
     <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
