@@ -8,19 +8,16 @@ const { PDFDocument, rgb } = require("pdf-lib");
 const fontKit = require ('@pdf-lib/fontkit')
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
-
 (async () => {
   const logoImageSrc = toImageSource("LogoText_Blue.png");
   const instructionImageSrc = toImageSource("instruction-cover.png");
-  const coverImageSrc = toImageSource("advanced-functions-cover.png");
+  const coverImageSrc = toImageSource("algebra-1-cover.png");
   const imageDataResponses = await fetchImages(data);
   const interFontRegularBase64 = fs.readFileSync("./Inter-Regular.txt", "utf8");
 
   const browser = await puppeteer.launch({
     protocolTimeout: 0,
   });
-  const page = await browser.newPage();
-  page.setDefaultNavigationTimeout(0);
 
   // Start build HTML content
   let combinedHtml;
@@ -29,109 +26,13 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   combinedHtml += buildTableOfContent(data);
   combinedHtml += await buildBookContent(imageDataResponses, data);
 
-  const finalHtml = `
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
-                <style>
-                @font-face {
-                  font-family: 'Inter';
-                  src: url(${fontContent}) format('truetype');
-                }
-
-                body {
-                    font-family: 'Inter', sans-serif;
-                }
-
-                ul li a {
-                    color: black;
-                    text-decoration: none; 
-                }
-            
-                ul ul li a {
-                    color: black;
-                }
-                    
-                .chapter {
-                    font-size: 30px;
-                    text-align: center;
-                    page-break-after: always;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    height: 90vh;
-                    margin: 0;
-                    display: flex;
-                }
-                
-                .chapter-name{
-                    font-weight: bold;
-                }
-                      
-                .chapter-name,
-                .chapter-material {
-                    color: #398fe5;
-                    margin: 10px 0;
-                }
-                      
-                .question-text {
-                    font-size: 20px;
-                    min-height: 25vh;
-                    margin-bottom: 20px;
-                }
-                      
-                .question-separator {
-                    border: 2px solid;
-                }
-                    
-                .question-text p:first-child {
-                    display: inline;
-                }  
-                    
-                .answerContainer {
-                    display: flex;
-                    flex-direction: row;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-left: 10%;
-                    margin-right: 10%;
-                    font-size: 20px;
-                }
-
-                .topicContainer {
-                    display: flex;
-                    flex-direction: row;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-
-                .qr {
-                    width: 50px;
-                    width: auto;
-                }
-                </style>
-            </head>
-            <body>
-                ${combinedHtml}
-                <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
-                <script>
-                    document.querySelectorAll('.latex').forEach(function(element) {
-                      try {
-                        katex.render(element.textContent, element);
-                      } catch (ex) {
-                        // prevent script break when facing invalid expression
-                      }
-                    });
-                </script>
-            </body>
-        </html>
-    `;
+  const finalHtml = buildFinalHtml("", combinedHtml);
+  const page = await browser.newPage();
+  page.setDefaultNavigationTimeout(0);
   await page.setContent(finalHtml);
-  // fs.writeFileSync("result.html", finalHtml, "utf-8");
   await page.addStyleTag({
     content: `@page:first {margin-top: -17px; margin-bottom: 0px; margin-right: -10px; margin-left: -10px}
-              @page{margin: 100px 80px 40px 80px;}
+              @page{margin: 90px 80px 50px 80px;}
     `,
   });
   const pdfBuffer = await getPdfConfig(page, logoImageSrc);
@@ -162,11 +63,11 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     const textContent = await page.$eval(`#${chapterId}`, (element) => {
       return element.textContent;
     });
-    const res = extractFirstNumberBeforeKeyword(parsedText,textContent);
+    const res = extractFirstNumberBeforeKeyword(parsedText, textContent);
     const chapterPageNum = res.extractedNumber;
     parsedText = res.modifiedText;
     const pageNumElementId = `page-num-chapter-${chapterIndex}`;
-    await page.evaluate(
+    await pageFinal.evaluate(
       (pageNumElementId, chapterPageNum) => {
         const spanElement = document.getElementById(pageNumElementId);
         if (spanElement) {
@@ -187,13 +88,16 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       if (materialIndex === 0) {
         materialPageNum = chapterPageNum;
       } else {
-        const resMaterial = extractFirstNumberBeforeKeyword(parsedText,textContent);
+        const resMaterial = extractFirstNumberBeforeKeyword(
+          parsedText,
+          textContent
+        );
         materialPageNum = resMaterial.extractedNumber;
         parsedText = resMaterial.modifiedText;
       }
 
       const pageNumMaterialId = `page-num-material-${chapterIndex}-${materialIndex}`;
-      await page.evaluate(
+      await pageFinal.evaluate(
         (pageNumMaterialId, materialPageNum) => {
           const element = document.getElementById(pageNumMaterialId);
           if (element) {
@@ -210,8 +114,6 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
 
   const pdfBufferWithToc = await getPdfConfig(pageFinal,logoImageSrc);
   const pdfDoc = await PDFDocument.load(pdfBufferWithToc);
-
-=======
   pdfDoc.registerFontkit(fontKit);
   const interRegular = fs.readFileSync('./font/Inter-Regular.ttf');
   const interBold = fs.readFileSync('./font/Inter-Bold.ttf');
@@ -219,7 +121,7 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const interBoldFont = await pdfDoc.embedFont(interBold);
   let prevText = "";
   let prevKey = 0;
-  mapMaterialPage[pdfDoc.getPageCount()+1] = "";
+  mapMaterialPage[pdfDoc.getPageCount() + 1] = "";
   for (let key in mapMaterialPage) {
     const numericKey = parseInt(key, 10);
     if (prevKey != 0) {
@@ -238,7 +140,6 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
     prevKey = numericKey;
   }
 
-  
   const firstPage = pdfDoc.getPage(0);
   const { width, height } = firstPage.getSize();
   const image = await pdfDoc.embedPng(coverImageSrc);
@@ -252,10 +153,10 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
   const secondPage = pdfDoc.getPage(1);
   const instructionImage = await pdfDoc.embedPng(instructionImageSrc);
   secondPage.drawImage(instructionImage, {
-    x: width/8,
-    y:  height/6,
-    width: width/1.3,
-    height: height/1.35,
+    x: width / 8,
+    y: height / 6,
+    width: width / 1.3,
+    height: height / 1.35,
   });
 
   for(let i = 1; i < pdfDoc.getPageCount(); i++) {
@@ -264,7 +165,8 @@ const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
       font: interBoldFont,
       x: width - 247,
       y: height - 47,
-      size: 10
+      size: 10,
+      fontWeight: 'bold'
     });
   }
 
@@ -281,7 +183,7 @@ function buildBookCover() {
   <div style="page-break-after: always;"></div>`;
 }
 
-function buildInstructionPage(instructionImageSrc) {
+function buildInstructionPage() {
   return `
   <div></div><div style="page-break-after: always;"></div>
   `;
@@ -309,7 +211,7 @@ function buildTableOfContent(data) {
 }
 
 async function buildBookContent(imageDataResponses, data) {
-  let content = '';
+  let content = "";
   let questionCount = 0;
   let questionCountGlobal = 0;
   let imageDataIndex = 0;
@@ -331,14 +233,20 @@ async function buildBookContent(imageDataResponses, data) {
       } else {
         content += `<div id="${materialId}" class="chapter chapter-material">${material.name}</div>`;
       }
-      content+=`<div id="${materialId}section">`;
+      content += `<div id="${materialId}section">`;
 
       for (const topic of material.topics) {
-        const topicUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${material.name}/lectures/${topic.id}`;
+        const topicUrl = `https://prepbox.io/worksheets/${formattedName(
+          data.name
+        )}/${formattedName(chapter.name)}/${material.name}/lectures/${
+          topic.id
+        }`;
         const topicQrCodeData = await QRCode.toDataURL(topicUrl);
         const maxTopicQuestion = questionCountGlobal + topic.questions.length;
         const topicHeader = `<div class= "topicContainer">
-                                <div style="font-size: 20px;">Accompanying lectures for questions ${questionCountGlobal + 1} - ${maxTopicQuestion}</div>
+                                <div style="font-size: 20px;">Accompanying lectures for questions ${
+                                  questionCountGlobal + 1
+                                } - ${maxTopicQuestion}</div>
                                 <a target="_blank" href="${topicUrl}" style="float: right; margin-right: 10%;">
                                   <img style="width: 100px;" src="${topicQrCodeData}"/>
                                 </a>
@@ -367,7 +275,11 @@ async function buildBookContent(imageDataResponses, data) {
           }
 
           content += `<div style="page-break-inside: avoid"><div class="question-text not-first-question">Question ${questionCountGlobal}: ${question_html}</div>`;
-          const solutionUrl = `https://prepbox.io/worksheets/${formattedName(data.name)}/${formattedName(chapter.name)}/${formattedName(material.name)}/${question.id}`;
+          const solutionUrl = `https://prepbox.io/worksheets/${formattedName(
+            data.name
+          )}/${formattedName(chapter.name)}/${formattedName(material.name)}/${
+            question.id
+          }`;
           const qrCodeSolutionDataUrl = await QRCode.toDataURL(solutionUrl);
           content += `<div class="answerContainer">
                         <div></div>
@@ -388,7 +300,7 @@ async function buildBookContent(imageDataResponses, data) {
               content += topicHeader;
             }
           }
-          content+= '</div>';
+          content += "</div>";
         }
 
         if (questionCount % 3 !== 0) {
@@ -433,11 +345,10 @@ async function getPdfConfig(page, imageSrc) {
       text-decoration: none; color: transparent">Let’s practice and review on PrepBoxx</a>
     </div>`,
     footerTemplate: `
-    <style>@font-face {font-family: 'Inter';src: url(${fontContent}) format('truetype');}</style>
     <div style="width: 100%; font-size: 14px;color: #bbb; position: relative;">
-        <div style="position: absolute; right: 50px; bottom: 20px"><span class="pageNumber"></span></div>
+        <div style="position: absolute; right: 50px; bottom: 20px;"><span class="pageNumber"></span></div>
     </div>
-    `,       
+    `,
   });
 }
 
