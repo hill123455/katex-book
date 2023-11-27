@@ -1,17 +1,18 @@
 const fs = require("fs");
 const puppeteer = require("puppeteer");
-const data = require("./fullbook2.json");
-const axios = require("axios");
 const QRCode = require("qrcode");
 const PDFParser = require("pdf-parse");
+const axios = require("axios");
 const { PDFDocument, rgb } = require("pdf-lib");
 const fontKit = require ('@pdf-lib/fontkit')
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
+// const data = require("./fullbook2.json");
 
 (async () => {
+  const data = await fetchBookDataFromApi('8db9067c-c9f5-4dc5-a1b4-9f0ea16696ea');
   const logoImageSrc = toImageSource("LogoText_Blue.png");
   const instructionImageSrc = toImageSource("instruction-cover.png");
-  const coverImageSrc = toImageSource("algebra-1-cover.png");
+  const coverImageSrc = toImageSource("./cover_image/high_school_algebra_cover.png");
   const imageDataResponses = await fetchImages(data);
   const interFontRegularBase64 = fs.readFileSync("./Inter-Regular.txt", "utf8");
 
@@ -481,4 +482,14 @@ function buildFinalHtml(customStyle, contentHtml, link) {
       </body>
   </html>
 `;
+}
+
+async function fetchBookDataFromApi(id) {
+  try {
+    const response = await axios.get(`https://app.prepanywhere.com/api/stu/static_books/get_full_book?id=${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching data from the API:", error.message);
+    throw error;
+  }
 }
