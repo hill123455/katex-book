@@ -6,7 +6,7 @@ const axios = require("axios");
 const { PDFDocument, rgb } = require("pdf-lib");
 const fontKit = require ('@pdf-lib/fontkit')
 const imgRegex = /<img\s+src="\/qimages\/(\d+)"\s*\/?>/g;
-// const data = require("./fullbook2.json");
+// const data = require("./book_data/fullbook.avg.json");
 
 (async () => {
   const data = await fetchBookDataFromApi('8db9067c-c9f5-4dc5-a1b4-9f0ea16696ea');
@@ -350,6 +350,7 @@ async function getPdfConfig(page, imageSrc) {
         <div style="position: absolute; right: 50px; bottom: 20px;"><span class="pageNumber"></span></div>
     </div>
     `,
+    width: 750,
   });
 }
 
